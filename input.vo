@@ -1,1 +1,2 @@
-echo("vo")
+vo a = "test"
+echo(a)
