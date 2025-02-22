@@ -1,2 +1,2 @@
-vo a = "test"
-echo(a)
+vo print = |b| echo(b)
+print("hello")

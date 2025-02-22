@@ -2,7 +2,7 @@ use nom::branch::alt;
 use nom::bytes::{complete::tag, take_until};
 use nom::character::complete::{alpha1, multispace0};
 use nom::combinator::map;
-use nom::multi::many0;
+use nom::multi::{many0, separated_list0};
 use nom::sequence::{delimited, preceded};
 use nom::{error::ParseError, IResult, Parser};
 
@@ -39,7 +39,8 @@ pub enum Expr {
     Void,
     Constant(Atom),
     Let(String, Box<Expr>),
-    Call(String, Box<Expr>),
+    Call(String, Vec<Expr>),
+    Closure(Vec<String>, Vec<Expr>),
 }
 
 pub fn parse_constant(input: &str) -> IResult<&str, Expr> {
@@ -57,17 +58,28 @@ pub fn parse_let(input: &str) -> IResult<&str, Expr> {
 }
 
 pub fn parse_call(input: &str) -> IResult<&str, Expr> {
-    let parse_name = alpha1;
-    let parse_arg = delimited(tag("("), parse_expr, tag(")"));
-    let parser = (parse_name, parse_arg);
-    map(parser, |(name, arg)| {
-        Expr::Call(name.to_string(), Box::new(arg))
-    })
-    .parse(input)
+    let parse_args = delimited(
+        tag("("),
+        separated_list0(tag(","), ws(parse_expr)),
+        tag(")"),
+    );
+    let parser = (parse_name, parse_args);
+    map(parser, |(name, args)| Expr::Call(name.to_string(), args)).parse(input)
+}
+
+pub fn parse_closure(input: &str) -> IResult<&str, Expr> {
+    let parse_name = map(alpha1, String::from);
+    let parse_args = delimited(
+        tag("|"),
+        separated_list0(tag(","), ws(parse_name)),
+        tag("|"),
+    );
+    let parser = (ws(parse_args), ws(parse_expr));
+    map(parser, |(args, expr)| Expr::Closure(args, vec![expr])).parse(input)
 }
 
 pub fn parse_expr(input: &str) -> IResult<&str, Expr> {
-    alt((parse_let, parse_call, parse_constant)).parse(input)
+    alt((parse_let, parse_call, parse_closure, parse_constant)).parse(input)
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Expr>> {
@@ -107,7 +119,7 @@ mod tests {
             result,
             Expr::Call(
                 "echo".to_string(),
-                Box::new(Expr::Constant(Atom::String("Hello, world!".to_string())))
+                vec![Expr::Constant(Atom::String("Hello, world!".to_string()))]
             )
         );
     }
@@ -124,6 +136,36 @@ mod tests {
                     Box::new(Expr::Constant(Atom::String("test".to_string())))
                 )
             )
+        }
+    }
+
+    #[test]
+    fn test_parse_closure() {
+        struct TestCase {
+            input: String,
+            expected: Expr,
+        }
+
+        let test_cases = vec![
+            TestCase {
+                input: "|a| \"hello\"".to_string(),
+                expected: Expr::Closure(
+                    vec!["a".to_string()],
+                    vec![Expr::Constant(Atom::String("hello".to_string()))],
+                ),
+            },
+            TestCase {
+                input: "|a, b| \"hello\"".to_string(),
+                expected: Expr::Closure(
+                    vec!["a".to_string(), "b".to_string()],
+                    vec![Expr::Constant(Atom::String("hello".to_string()))],
+                ),
+            },
+        ];
+
+        for tc in test_cases {
+            let (_, result) = parse_closure(&tc.input).unwrap();
+            assert_eq!(result, tc.expected);
         }
     }
 }
