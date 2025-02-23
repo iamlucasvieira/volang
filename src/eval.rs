@@ -8,7 +8,7 @@ pub fn eval(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
             if name == "echo" {
                 for arg in args {
                     let arg = eval(arg, context);
-                    print!("{arg:?}");
+                    print!("{arg}");
                 }
             } else {
                 match context.get(&name) {
@@ -39,4 +39,3 @@ pub fn eval(expr: Expr, context: &mut HashMap<String, Expr>) -> Expr {
         Expr::Void | Expr::Closure(_, _) => expr,
     }
 }
-

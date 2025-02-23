@@ -3,19 +3,22 @@ use nom::bytes::{complete::tag, take_until};
 use nom::character::complete::{alpha1, multispace0};
 use nom::combinator::map;
 use nom::multi::{many0, separated_list0};
+use nom::number::complete::double;
 use nom::sequence::{delimited, preceded};
 use nom::{error::ParseError, IResult, Parser};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Atom {
     String(String),
     Name(String),
+    Float(f64),
 }
 
 impl std::fmt::Display for Atom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Atom::String(string) => write!(f, "{string}"),
+            Atom::String(string) => write!(f, "\"{string}\""),
+            Atom::Float(number) => write!(f, "{number}"),
             Atom::Name(string) => write!(f, "{string}"),
         }
     }
@@ -26,15 +29,19 @@ pub fn parse_string(input: &str) -> IResult<&str, Atom> {
     map(parser, |string: &str| Atom::String(string.to_string())).parse(input)
 }
 
+pub fn parse_float(input: &str) -> IResult<&str, Atom> {
+    map(double, |number: f64| Atom::Float(number)).parse(input)
+}
+
 pub fn parse_name(input: &str) -> IResult<&str, Atom> {
     map(alpha1, |string: &str| Atom::Name(string.to_string())).parse(input)
 }
 
 pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
-    alt((parse_string, parse_name)).parse(input)
+    alt((parse_float, parse_string, parse_name)).parse(input)
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Void,
     Constant(Atom),
@@ -43,6 +50,14 @@ pub enum Expr {
     Closure(Vec<String>, Vec<Expr>),
 }
 
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::Constant(atom) => write!(f, "{atom}"),
+            _ => write!(f, ""),
+        }
+    }
+}
 pub fn parse_constant(input: &str) -> IResult<&str, Expr> {
     map(parse_atom, Expr::Constant).parse(input)
 }
@@ -109,6 +124,13 @@ mod tests {
         let input = "test";
         let (_, result) = parse_name(input).unwrap();
         assert_eq!(result, Atom::Name("test".to_string()));
+    }
+
+    #[test]
+    fn test_parse_float() {
+        let input = "1.0";
+        let (_, result) = parse_float(input).unwrap();
+        assert_eq!(result, Atom::Float(1.0));
     }
 
     #[test]

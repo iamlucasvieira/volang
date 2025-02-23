@@ -1,2 +1,2 @@
-vo print = |b| echo(b)
-print("hello")
+vo num = |a| echo(a)
+num(123)
